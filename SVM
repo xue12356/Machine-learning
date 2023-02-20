@@ -1,0 +1,54 @@
+#######清除变量，导入相应的包集及数据####
+rm(list=ls())
+setwd("D:/process data/MS/R summary/SVM")
+library(pROC)
+library(e1071)
+
+#导入数据集
+iris <- read.table('all sample-three.txt', sep = '\t', header = TRUE, fill = TRUE)
+
+
+##########划分训练和测试集#################
+set.seed(2008)
+train.indeces<-sample(1:nrow(iris),142)
+iris.train<-iris[train.indeces,]
+iris.test<-iris[-train.indeces,]
+
+
+##############SVM参数的调试################
+svm_test <- function(x,y){
+  type <- c('C-classification','nu-classification','one-classification')
+  kernel <- c('linear','polynomial','radial','sigmoid')
+  pred <- array(0, dim=c(nrow(x),3,4))
+  errors <- matrix(0,3,4)
+  dimnames(errors) <- list(type, kernel)
+  for(i in 1:3){
+    for(j in 1:4){
+      pred[,i,j] <- predict(object = svm(x, y, type = type[i], kernel = kernel[j]), newdata = x)
+      if(i > 2) errors[i,j] <- sum(pred[,i,j] != 1)
+      else errors[i,j] <- sum(pred[,i,j] != as.integer(y))
+    }
+  }
+  return(errors)
+}
+
+iris_x <- iris[,2:26]
+iris_y <- iris[,1]
+svm_test(x=iris_x,y=iris_y)
+
+tuned <- tune.svm(Species ~., data = iris.train, gamma = 10^(-6:-1), cost = 10^(1:2))#调试模型
+summary (tuned) # to select best gamma and cost，就看哪个值下的错误率最小，就选择相应的gamma 和cost
+
+########采用svm函数基于训练集iris.train建立SVM模型########
+model<-svm(formula=Species~.,data=iris.train, kernel = "radial", cost = 10, gamma=0.01, probability = TRUE)
+results_train<-predict(object=model,newdata=iris.train,type="class")
+
+(res_train<-table(results_train,iris.train$Species)) 
+
+(accurary<-sum(diag(res_train))/sum(res_train))
+
+#############用测试数据集预测#####################
+results_test<-predict(object=model,newdata=iris.test,type="class")
+(res_test<-table(results_test,iris.test$Species))
+
+(accurary<-sum(diag(res_test))/sum(res_test))
