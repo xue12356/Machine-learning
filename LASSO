@@ -1,0 +1,75 @@
+############清除变量，导入相应的包集及数据#######
+rm(list=ls())
+library(glmnet)
+library(caret)
+library(pROC)
+
+#导入数据集
+iris <- read.table('all sample-three.txt', sep = '\t', header = TRUE, fill = TRUE)
+
+##############划分训练和测试集#################
+set.seed(2008)
+inA <- createDataPartition(iris$Species,
+                           p = 0.66,
+                           times = 1,
+                           list = F)
+length(inA)
+head(inA)
+train_cl <- iris[inA,]
+test_cl <- iris[-inA,]
+
+#对训练集样本进行归纳和分类
+x <- train_cl[,2:26]
+y <- train_cl[,1]
+
+#################基于训练集的LASOO模型构建##############
+model_lasso <- glmnet(x, y, nlambda=100, alpha=1)
+print(model_lasso)
+
+plot(model_lasso, xvar="lambda", label=TRUE)
+#筛选最佳λ值：
+x<-as.matrix(x) 
+cv_fit <- cv.glmnet(x = x,y = y,nlambda = 1000,alpha = 1) 
+plot(cv_fit)
+
+##################基于不同lambda值筛选特征峰#############
+lambda.min <- cv_fit$lambda.min
+lambda.1se <- cv_fit$lambda.1se
+lambda.min
+lambda.1se
+model_lasso_min <- glmnet(x, y, alpha = 1, lambda = lambda.min)
+model_lasso_1se <- glmnet(x, y, alpha = 1, lambda = lambda.1se)
+
+head(model_lasso_min$beta)#".
+
+gene_min <- rownames(model_lasso_min$beta)[as.numeric(model_lasso_min$beta)!=0]#as.numeric后"."会转化为0
+gene_1se <- rownames(model_lasso_1se$beta)[as.numeric(model_lasso_1se$beta)!=0]
+length(gene_min)
+length(gene_1se)
+gene_min
+gene_1se
+
+#模型预测-训练集自己预测
+xx <- train_cl[,2:26]
+xx<-as.matrix(xx)
+yy <- train_cl$Species
+
+lasso.prob <- predict(cv_fit, newx = xx,
+                      s = c(lambda.min,lambda.1se) )
+df <- as.data.frame(cbind(yy ,lasso.prob))
+colnames(df) <- c("event","pre_min","pre_1se")
+head(df)
+train_df <- df
+
+#模型预测-测试集预测
+xx <- test_cl[,2:26]
+xx<-as.matrix(xx)
+yy <- test_cl$Species
+lasso.prob <- predict(cv_fit, newx = xx,
+                      s = c(lambda.min,lambda.1se) )
+df <- as.data.frame(cbind(yy ,lasso.prob))
+colnames(df) <- c("event","pre_min","pre_1se")
+head(df)
+test_df <- df
+write.table(test_df, "test_df.csv")
+write.table(train_df, "train_df.csv")
