@@ -1,0 +1,29 @@
+############清除变量，导入相应的包集及数据#######
+rm(list=ls())
+library(nnet)
+library(pROC)
+#导入all sample的数据集
+iris <- read.table('all sample-three.txt', sep = '\t', header = TRUE, fill = TRUE)
+set.seed(2011)
+train.indeces<-sample(1:nrow(iris),142)
+iris.train<-iris[train.indeces,]
+iris.test<-iris[-train.indeces,]
+
+###############基于训练集构建ANN模型################
+iris_BP_model <- nnet(Species ~.,data=iris.train,size=10,
+                         decay=5e-4,maxit=200,rang=0.1)
+iris_BP_model$wts
+head(iris_BP_model$fitted.values)
+
+iris_pred_table1 <- table(iris.train$Species, predict(iris_BP_model, 
+                                                    iris.train, type = "class"))
+iris_pred_table1
+model_accuracy1 <- sum(diag(iris_pred_table1))/sum(iris_pred_table1)
+model_accuracy1
+
+#############用验证数据集预测#####################
+iris_pred_table <- table(iris.test$Species, predict(iris_BP_model, 
+                                                      iris.test, type = "class"))
+iris_pred_table
+model_accuracy <- sum(diag(iris_pred_table))/sum(iris_pred_table)
+model_accuracy
